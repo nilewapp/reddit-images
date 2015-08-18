@@ -1,0 +1,21 @@
+# Which subreddits that should be queried
+subreddits:
+  - earthporn
+
+# Maximum number of images that should be downloaded
+max-images: 10
+
+# Number of seconds between polls
+period: 1800
+
+# Directory where downloaded images will be stored
+download-directory: '/tmp/reddit-images'
+
+# Whether or not images that have left the top should be removed
+remove-previous-image: yes
+
+# Reddit user (optional)
+reddit-user: ''
+
+# Where this script can be downloaded
+project-url: 'https://github.com/nilewapp/reddit-images'
