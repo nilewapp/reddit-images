@@ -6,6 +6,7 @@ import os
 import praw
 import shutil
 import signal
+import sys
 import time
 import urllib
 import urllib.parse as urlparse
