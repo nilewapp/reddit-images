@@ -89,38 +89,44 @@ def main():
 
         logger.info('Starting %s', name)
 
-        results = praw.Reddit(user_agent=user_agent(url, user)).get_subreddit(subreddits)
-
         iteration = 0
+
         while True:
-            iteration = iteration + 1
-            logger.info('Iteration %s', iteration)
+            try:
+                results = praw.Reddit(user_agent=user_agent(url, user)).get_subreddit(subreddits)
 
-            urls = [ rewrite_url(s.url) for s in results.get_hot(limit=max_downloads) ]
-            urls = [ u for u in urls if u.endswith('.jpg') ]
-            num_urls = len(urls)
+                while True:
+                    iteration = iteration + 1
+                    logger.info('Iteration %s', iteration)
 
-            # Simple way of finding the number of urls needed to
-            # get the desired number of images
-            if num_urls != max_images:
-                max_downloads = math.ceil(max_downloads*max_images/num_urls)
+                    urls = [ rewrite_url(s.url) for s in results.get_hot(limit=max_downloads) ]
+                    urls = [ u for u in urls if u.endswith('.jpg') ]
+                    num_urls = len(urls)
 
-            urls = set(urls[:max_images])
-            images = set([ (u,image_path(dir, u)) for u in urls ])
+                    # Simple way of finding the number of urls needed to
+                    # get the desired number of images
+                    if num_urls != max_images:
+                        max_downloads = math.ceil(max_downloads*max_images/num_urls)
 
-            for new_image in images - prev_images:
-                try:
-                    download(new_image[0], new_image[1])
-                except urllib.error.HTTPError:
-                    logger.info('Failed to download %s', new_image[0])
-                    continue
-                prev_images.add(new_image)
+                    urls = set(urls[:max_images])
+                    images = set([ (u,image_path(dir, u)) for u in urls ])
 
-            for old_image in prev_images - images:
-                remove(old_image[1])
-                prev_images.discard(old_image)
+                    for new_image in images - prev_images:
+                        try:
+                            download(new_image[0], new_image[1])
+                        except urllib.error.HTTPError:
+                            logger.info('Failed to download %s', new_image[0])
+                            continue
+                        prev_images.add(new_image)
 
-            time.sleep(period)
+                    for old_image in prev_images - images:
+                        remove(old_image[1])
+                        prev_images.discard(old_image)
+
+                    time.sleep(period)
+            except:
+                logger.info('Caught exception: %s', sys.exc_info()[0])
+                time.sleep(5)
 
         logger.info('Exiting %s', name)
 
