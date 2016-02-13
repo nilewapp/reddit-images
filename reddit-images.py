@@ -7,11 +7,13 @@ import praw
 import shutil
 import signal
 import sys
+import tempfile
 import time
 import urllib
 import urllib.parse as urlparse
 import urllib.request as urlreq
 import yaml
+from PIL import Image
 
 version = '0.1'
 name = 'reddit-images'
@@ -58,10 +60,11 @@ def user_agent(url, user):
     else:
         return '{} with {}'.format(user, prj)
 
-def download(url, filename):
-    with urlreq.urlopen(url) as response, open(filename, 'wb') as ofile:
+def download(url, ofile):
+    with urlreq.urlopen(url) as response:
         logger.info('Download %s', url)
         shutil.copyfileobj(response, ofile)
+        ofile.seek(0)
 
 def main():
     global rm_old
@@ -72,63 +75,82 @@ def main():
     parser.add_argument('config_file')
     args = parser.parse_args()
 
-    with open(args.config_file) as file:
-        cfg = yaml.load(file)
+    iteration = 0
 
-        period = cfg['period']
-        dir = cfg['download-directory']
-        rm_old = cfg['remove-previous-image']
-        user = cfg['reddit-user']
-        url = cfg['project-url']
-        max_images = cfg['max-images']
-        max_downloads = max_images
-        subreddits = '+'.join(set(cfg['subreddits']))
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(name)
 
-        logging.basicConfig(level=logging.INFO)
-        logger = logging.getLogger(name)
+    logger.info('Starting %s', name)
 
-        logger.info('Starting %s', name)
+    while True:
+        with open(args.config_file) as cfgfile:
+            cfg = yaml.load(cfgfile)
 
-        iteration = 0
+            period = cfg['period']
+            dir = cfg['download-directory']
+            rm_old = cfg['remove-previous-image']
+            user = cfg['reddit-user']
+            url = cfg['project-url']
+            max_images = cfg['max-images']
+            max_downloads = max_images
+            subreddits = '+'.join(set(cfg['subreddits']))
+            min_width = cfg['min-width']
+            min_height = cfg['min-height']
 
-        while True:
+            results = praw.Reddit(user_agent=user_agent(url, user)).get_subreddit(subreddits)
+
+            iteration = iteration + 1
+            logger.info('Iteration %s', iteration)
+
+            urls = []
+
             try:
-                results = praw.Reddit(user_agent=user_agent(url, user)).get_subreddit(subreddits)
-
-                while True:
-                    iteration = iteration + 1
-                    logger.info('Iteration %s', iteration)
-
-                    urls = [ rewrite_url(s.url) for s in results.get_hot(limit=max_downloads) ]
-                    urls = [ u for u in urls if u.endswith('.jpg') ]
-                    num_urls = len(urls)
-
-                    # Simple way of finding the number of urls needed to
-                    # get the desired number of images
-                    if num_urls != max_images:
-                        max_downloads = math.ceil(max_downloads*max_images/num_urls)
-
-                    urls = set(urls[:max_images])
-                    images = set([ (u,image_path(dir, u)) for u in urls ])
-
-                    for new_image in images - prev_images:
-                        try:
-                            download(new_image[0], new_image[1])
-                        except urllib.error.HTTPError:
-                            logger.info('Failed to download %s', new_image[0])
-                            continue
-                        prev_images.add(new_image)
-
-                    for old_image in prev_images - images:
-                        remove(old_image[1])
-                        prev_images.discard(old_image)
-
-                    time.sleep(period)
+                urls = results.get_hot(limit=max_downloads)
             except:
-                logger.info('Caught exception: %s', sys.exc_info()[0])
+                logger.info('Failed to get hot links')
                 time.sleep(5)
+                continue
 
-        logger.info('Exiting %s', name)
+            urls = [ rewrite_url(s.url) for s in urls ]
+            urls = [ u for u in urls if u.endswith('.jpg') ]
+            num_urls = len(urls)
+
+            # Simple way of finding the number of urls needed to
+            # get the desired number of images
+            if num_urls != max_images:
+                max_downloads = math.ceil(max_downloads*max_images/num_urls)
+
+            urls = set(urls[:max_images])
+            images = set([ (u,image_path(dir, u)) for u in urls ])
+
+            for new_image in images - prev_images:
+                try:
+                    with tempfile.TemporaryFile() as tmpfile:
+                        download(new_image[0], tmpfile)
+
+                        im = Image.open(tmpfile)
+
+                        if im.width < cfg['min-width'] and im.height < cfg['min-height']:
+                            logger.info('Rejecting small image %s (dimensions %dx%d)', new_image[0], im.width, im.height)
+                            continue
+
+                        tmpfile.seek(0)
+                        with open(new_image[1], 'wb') as ofile:
+                            shutil.copyfileobj(tmpfile, ofile)
+
+                except urllib.error.HTTPError:
+                    logger.info('Failed to download %s', new_image[0])
+                    continue
+
+                prev_images.add(new_image)
+
+            for old_image in prev_images - images:
+                remove(old_image[1])
+                prev_images.discard(old_image)
+
+            time.sleep(period)
+
+    logger.info('Exiting %s', name)
 
 if __name__ == "__main__":
     main()

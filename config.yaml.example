@@ -8,6 +8,10 @@ max-images: 10
 # Number of seconds between polls
 period: 1800
 
+# Image dimensions
+min-width: 0
+min-height: 0
+
 # Directory where downloaded images will be stored
 download-directory: '/tmp/reddit-images'
 
