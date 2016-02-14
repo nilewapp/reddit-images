@@ -97,6 +97,9 @@ def main():
             min_width = cfg['min-width']
             min_height = cfg['min-height']
 
+            if not os.path.isdir(dir):
+                os.makedirs(dir)
+
             results = praw.Reddit(user_agent=user_agent(url, user)).get_subreddit(subreddits)
 
             iteration = iteration + 1
