@@ -116,12 +116,6 @@ def main():
 
             urls = [ rewrite_url(s.url) for s in urls ]
             urls = [ u for u in urls if u.endswith('.jpg') ]
-            num_urls = len(urls)
-
-            # Simple way of finding the number of urls needed to
-            # get the desired number of images
-            if num_urls != max_images:
-                max_downloads = math.ceil(max_downloads*max_images/num_urls)
 
             urls = set(urls[:max_images])
             images = set([ (u,image_path(dir, u)) for u in urls ])
@@ -150,6 +144,11 @@ def main():
             for old_image in prev_images - images:
                 remove(old_image[1])
                 prev_images.discard(old_image)
+
+            # Simple way of finding the number of urls needed to
+            # get the desired number of images
+            if num_urls != max_images:
+                max_downloads = math.ceil(max_downloads*max_images/len(prev_images))
 
             time.sleep(period)
 
