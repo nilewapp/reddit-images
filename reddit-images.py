@@ -105,16 +105,15 @@ def main():
             iteration = iteration + 1
             logger.info('Iteration %s', iteration)
 
-            urls = []
+            urls = results.get_hot(limit=max_downloads)
 
             try:
-                urls = results.get_hot(limit=max_downloads)
+                urls = [ rewrite_url(s.url) for s in urls ]
             except:
                 logger.info('Failed to get hot links')
                 time.sleep(5)
                 continue
 
-            urls = [ rewrite_url(s.url) for s in urls ]
             urls = [ u for u in urls if u.endswith('.jpg') ]
 
             urls = set(urls[:max_images])
